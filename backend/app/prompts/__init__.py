@@ -1,0 +1,1 @@
+# WhisperNet Backend — Prompt Templates
