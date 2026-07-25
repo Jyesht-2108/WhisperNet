@@ -78,7 +78,7 @@ async def generate_prompt(request: GeneratePromptRequest) -> GeneratePromptRespo
         logger.debug("Extracted entities: %s", entity_str)
 
     if not optimized_query.strip():
-        optimized_query = "Solo Leveling lore context"
+        optimized_query = "Story lore context"
 
     # ── Step 3: Query Databricks for lore ──
     try:
@@ -128,3 +128,28 @@ async def generate_prompt(request: GeneratePromptRequest) -> GeneratePromptRespo
         user_input=prompt_result["user_input"],
         active_character=prompt_result["active_character"],
     )
+
+from pydantic import BaseModel
+
+class SearchLoreRequest(BaseModel):
+    query: str
+    episode_index: int = 999  # default max episode
+
+@router.post("/search-lore")
+async def search_lore(query: str) -> dict:
+    """
+    Direct lore lookup endpoint for OpenAI Realtime Tool Calling.
+    """
+    logger.info("Tool call search-lore: query='%s'", query)
+    try:
+        databricks_result = await _databricks_client.query_lore(
+            query=query,
+            current_context="",
+            max_episode_index=999,
+            top_k=3,
+        )
+        chunks = databricks_result.get("retrieved_chunks", [])
+        return {"results": chunks}
+    except Exception as e:
+        logger.error("Tool Databricks query failed: %s", str(e))
+        return {"error": "Failed to search lore."}
