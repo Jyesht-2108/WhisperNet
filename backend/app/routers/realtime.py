@@ -88,7 +88,7 @@ async def exchange_token(request: RealtimeTokenRequest) -> RealtimeTokenResponse
 
             # Step 2: Use ephemeral key to negotiate WebRTC SDP
             sdp_response = await client.post(
-                f"https://api.openai.com/v1/realtime?model={request.model}",
+                "https://api.openai.com/v1/realtime/calls",
                 headers={
                     "Authorization": f"Bearer {ephemeral_key}",
                     "Content-Type": "application/sdp",

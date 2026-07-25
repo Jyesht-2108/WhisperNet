@@ -21,6 +21,7 @@
 import type {
   SessionUpdateEvent,
   RealtimeDataChannelEvent,
+  ResponseDoneEvent,
 } from '../types';
 
 // --------------- Configuration ---------------
@@ -39,6 +40,7 @@ export class RealtimeClient {
   private remoteAudioEl: HTMLAudioElement | null = null;
   private micStream: MediaStream | null = null;
   private backendUrl: string;
+  private model: string;
   private isConnected: boolean = false;
 
   // Callbacks
@@ -46,8 +48,9 @@ export class RealtimeClient {
   private onAiTranscript: ((text: string) => void) | null = null;
   private onError: ((error: string) => void) | null = null;
 
-  constructor(backendUrl: string) {
+  constructor(backendUrl: string, model: string) {
     this.backendUrl = backendUrl;
+    this.model = model;
   }
 
   // --------------- Lifecycle ---------------
@@ -225,8 +228,22 @@ export class RealtimeClient {
 
       switch (data.type) {
         case 'response.done':
-          console.log('[WhisperNet RTC] AI response complete.');
-          this.onResponseDone?.();
+          const status = (data as ResponseDoneEvent).response?.status;
+          console.log(`[WhisperNet RTC] AI response done with status: ${status}`);
+          if (status === 'cancelled' || status === 'incomplete') {
+            console.log('[WhisperNet RTC] Response was cancelled/incomplete. Keeping session open.');
+          } else {
+            this.onResponseDone?.();
+          }
+          break;
+
+        case 'response.created':
+          console.log('[WhisperNet RTC] AI response created. Muting user mic to prevent echo interruption.');
+          this.setMicEnabled(false);
+          break;
+
+        case 'response.function_call_arguments.done':
+          this.handleFunctionCall(data as any);
           break;
 
         case 'response.audio_transcript.done':
@@ -260,6 +277,43 @@ export class RealtimeClient {
     }
   }
 
+  private async handleFunctionCall(data: any): Promise<void> {
+    try {
+      if (data.name !== 'search_lore') return;
+      
+      const args = JSON.parse(data.arguments);
+      console.log(`[WhisperNet RTC] AI called search_lore with query: "${args.query}"`);
+
+      // 1. Call backend to search lore
+      const response = await fetch(`${this.backendUrl}/api/search-lore?query=${encodeURIComponent(args.query)}`, {
+        method: 'POST'
+      });
+      const result = await response.json();
+
+      // 2. Send function call output to OpenAI
+      const functionOutputEvent = {
+        type: 'conversation.item.create',
+        item: {
+          type: 'function_call_output',
+          call_id: data.call_id,
+          output: JSON.stringify(result)
+        }
+      };
+      this.dataChannel!.send(JSON.stringify(functionOutputEvent));
+      console.log('[WhisperNet RTC] Sent function_call_output to AI.');
+
+      // 3. Prompt AI to continue generating response
+      const responseCreateEvent = {
+        type: 'response.create'
+      };
+      this.dataChannel!.send(JSON.stringify(responseCreateEvent));
+      console.log('[WhisperNet RTC] Requested response.create.');
+
+    } catch (err) {
+      console.error('[WhisperNet RTC] Error handling function call:', err);
+    }
+  }
+
   // --------------- Session Update ---------------
 
   /**
@@ -278,16 +332,35 @@ export class RealtimeClient {
     const event: SessionUpdateEvent = {
       type: 'session.update',
       session: {
+        type: 'realtime',
         instructions,
-        turn_detection: {
-          type: 'server_vad',
-          threshold: 0.5,
-          prefix_padding_ms: 300,
-          silence_duration_ms: 500,
+        audio: {
+          input: {
+            turn_detection: {
+              type: 'server_vad',
+              threshold: 0.5,
+              prefix_padding_ms: 300,
+              silence_duration_ms: 1200,
+            }
+          },
+          output: {
+            voice: voice ?? 'alloy'
+          }
         },
-        voice: voice ?? 'alloy',
-        input_audio_format: 'pcm16',
-        output_audio_format: 'pcm16',
+        tools: [
+          {
+            type: 'function',
+            name: 'search_lore',
+            description: 'Search the story lore database to answer questions about characters, items, or events.',
+            parameters: {
+              type: 'object',
+              properties: {
+                query: { type: 'string', description: 'The specific entity or question to look up' }
+              },
+              required: ['query']
+            }
+          }
+        ]
       },
     };
 
@@ -333,6 +406,7 @@ export class RealtimeClient {
       },
       body: JSON.stringify({
         sdp_offer: localSdp,
+        model: this.model,
       }),
     });
 

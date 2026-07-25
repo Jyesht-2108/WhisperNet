@@ -140,21 +140,25 @@ export interface BackendPromptResponse {
 export interface SessionUpdateEvent {
   type: 'session.update';
   session: {
-    /** The fully fused persona prompt from Member 3 */
-    instructions: string;
-    /** Server-side voice activity detection config */
-    turn_detection: {
-      type: 'server_vad';
-      threshold?: number;
-      prefix_padding_ms?: number;
-      silence_duration_ms?: number;
+    type?: string;
+    instructions?: string;
+    tools?: any[];
+    modalities?: string[];
+    audio?: {
+      input?: {
+        format?: { type: string; rate?: number };
+        turn_detection?: {
+          type: 'server_vad';
+          threshold?: number;
+          prefix_padding_ms?: number;
+          silence_duration_ms?: number;
+        };
+      };
+      output?: {
+        format?: { type: string; rate?: number };
+        voice?: string;
+      };
     };
-    /** Voice configuration */
-    voice?: string;
-    /** Input audio format */
-    input_audio_format?: string;
-    /** Output audio format */
-    output_audio_format?: string;
   };
 }
 

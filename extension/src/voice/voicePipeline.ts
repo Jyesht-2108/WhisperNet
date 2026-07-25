@@ -56,7 +56,7 @@ export class VoicePipeline {
     );
 
     // Initialize the WebRTC client
-    this.realtime = new RealtimeClient(config.backendUrl);
+    this.realtime = new RealtimeClient(config.backendUrl, config.realtimeModel || 'gpt-4o-realtime-preview-2024-12-17');
 
     // Wire WebRTC callbacks
     this.realtime.setOnResponseDone(() => {
@@ -134,8 +134,9 @@ export class VoicePipeline {
    */
   async handleInterruption(episodeIndex: number, timestamp: number): Promise<void> {
     try {
-      // Step 1: Freeze the rolling buffer
+      // Step 1: Freeze the rolling buffer and pause passive STT
       this.buffer.freeze();
+      this.stt.pause();
       const frozenContext = this.buffer.getContext();
 
       console.log(
@@ -177,6 +178,7 @@ export class VoicePipeline {
 
       // Attempt to recover — unfreeze buffer and let the user resume
       this.buffer.unfreeze();
+      this.stt.resume();
       this.callbacks.onStateChange('listening');
     }
   }
@@ -195,19 +197,14 @@ export class VoicePipeline {
    * 3. Unfreeze the rolling buffer
    */
   private handleResponseDone(): void {
-    console.log('[WhisperNet Pipeline] AI finished speaking, resolving...');
-
-    // Step 1: Mute the mic
+    console.log('[WhisperNet Pipeline] AI finished generating response.');
+    
+    // 1. Mute the mic
     this.realtime.setMicEnabled(false);
 
-    // Step 2: Notify UI to resume Pocket FM playback
-    this.callbacks.onResponseDone();
-
-    // Step 3: Unfreeze the buffer so new STT deltas flow in
-    this.buffer.unfreeze();
-
-    // Step 4: Transition UI back to listening state
-    this.callbacks.onStateChange('listening');
+    // Note: We deliberately do NOT call this.callbacks.onResponseDone() here!
+    // The user must manually click "Resume Story" to prevent the story audio
+    // from overlapping with the AI's WebRTC audio buffer.
   }
 
   /**

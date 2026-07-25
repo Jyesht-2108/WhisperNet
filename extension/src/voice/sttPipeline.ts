@@ -71,8 +71,10 @@ export class SttPipeline {
     console.log('[WhisperNet STT] Pipeline stopped.');
   }
 
+  private isPaused: boolean = false;
+
   private messageListener = (message: any) => {
-    if (!this.isRunning) return;
+    if (!this.isRunning || this.isPaused) return;
 
     if (message.action === 'AUDIO_CHUNK_EMITTED' && message.payload?.dataUrl) {
       // Convert base64 dataUrl back to a Blob
@@ -84,6 +86,18 @@ export class SttPipeline {
         .catch((err) => console.error('[WhisperNet STT] Failed to convert dataUrl to Blob:', err));
     }
   };
+
+  pause(): void {
+    this.isPaused = true;
+    this.chunkQueue = []; // clear any pending chunks
+    console.log('[WhisperNet STT] Pipeline paused.');
+  }
+
+  resume(): void {
+    this.isPaused = false;
+    this.chunkQueue = [];
+    console.log('[WhisperNet STT] Pipeline resumed.');
+  }
 
   private subscribeToAudioChunks(): void {
     chrome.runtime.onMessage.addListener(this.messageListener);

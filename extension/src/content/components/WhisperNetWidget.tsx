@@ -103,7 +103,7 @@ function getBarStyles(index: number) {
 function getPipelineConfig(): VoicePipelineConfig {
   return {
     backendUrl: 'http://localhost:8000',
-    realtimeModel: 'gpt-realtime-2',
+    realtimeModel: 'gpt-realtime-2.1',
     bufferMaxWords: 150,
     bufferTrimInterval: 5000,
   };
@@ -143,6 +143,7 @@ export const WhisperNetWidget: React.FC = () => {
         setRollingContext(context);
       },
       onAiTranscript: (text) => {
+        setWidgetState('speaking');
         setAiTranscript(text);
       },
       onError: (error) => {
@@ -242,7 +243,11 @@ export const WhisperNetWidget: React.FC = () => {
     try {
       await pipelineRef.current?.handleInterruption(episodeIndex, timestamp);
     } catch (err) {
-      console.error('[WhisperNet Widget] Ask character failed:', err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      console.error('[WhisperNet Widget] Ask character failed:', errMsg);
+      setPipelineError(`Interruption Error: ${errMsg}`);
+      setTimeout(() => setPipelineError(null), 5000);
+      
       // Recover by resuming playback
       await resumePlayer();
       setWidgetState('listening');
