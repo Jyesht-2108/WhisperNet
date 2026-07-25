@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>WhisperNet Offscreen Audio Processor</title>
+</head>
+<body>
+  <!-- 
+    This offscreen document is used by WhisperNet to process captured tab audio.
+    It runs in a separate context from the visible page and handles:
+      1. Acquiring the media stream from chrome.tabCapture
+      2. Routing audio back to the user's speakers (zero disruption)
+      3. Chunking audio into 1-second WebM segments for STT processing
+  -->
+  <script type="module" src="./offscreen.ts"></script>
+</body>
+</html>
