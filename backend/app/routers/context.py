@@ -58,12 +58,7 @@ async def generate_prompt(request: GeneratePromptRequest) -> GeneratePromptRespo
     start_time = time.perf_counter()
 
     # ── Step 1: Sanitize user input ──
-    sanitized_query = _sanitizer.sanitize(request.user_query)
-    if not sanitized_query:
-        raise HTTPException(
-            status_code=400,
-            detail="User query is empty after sanitization.",
-        )
+    sanitized_query = _sanitizer.sanitize(request.user_query) if request.user_query else ""
 
     logger.info(
         "Generate prompt request: query='%s' | episode=%d | context_len=%d",
@@ -81,6 +76,9 @@ async def generate_prompt(request: GeneratePromptRequest) -> GeneratePromptRespo
         entity_str = ", ".join(entities[:5])
         optimized_query = f"{sanitized_query} [Entities: {entity_str}]"
         logger.debug("Extracted entities: %s", entity_str)
+
+    if not optimized_query.strip():
+        optimized_query = "Solo Leveling lore context"
 
     # ── Step 3: Query Databricks for lore ──
     try:

@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import context, health, realtime, session, websocket
+from app.routers import context, health, realtime, session, websocket, stt
 from app.services.session_manager import SessionManager
 
 # ── Configure logging ──
@@ -75,6 +75,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(context.router)
 app.include_router(realtime.router)
+app.include_router(stt.router)
 app.include_router(session.router)
 app.include_router(websocket.router)
 

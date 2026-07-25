@@ -324,7 +324,7 @@ export class RealtimeClient {
    * This ensures the OpenAI API key is NEVER exposed to the client.
    */
   private async exchangeSdpWithBackend(localSdp: string): Promise<string> {
-    const endpoint = `${this.backendUrl}/api/realtime/session`;
+    const endpoint = `${this.backendUrl}/api/realtime/token`;
 
     const response = await fetch(endpoint, {
       method: 'POST',

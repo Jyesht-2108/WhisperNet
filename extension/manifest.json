@@ -15,15 +15,17 @@
     "storage"
   ],
   "host_permissions": [
-    "*://*.pocketfm.com/*"
+    "*://*.pocketfm.com/*",
+    "*://pocketfm.com/*"
   ],
   "background": {
     "service_worker": "src/background.ts",
     "type": "module"
   },
+  "action": {},
   "content_scripts": [
     {
-      "matches": ["*://*.pocketfm.com/*"],
+      "matches": ["*://*.pocketfm.com/*", "*://pocketfm.com/*"],
       "js": ["src/content/content.tsx"],
       "run_at": "document_idle"
     }

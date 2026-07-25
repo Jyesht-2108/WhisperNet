@@ -49,12 +49,10 @@ export class VoicePipeline {
       callbacks.onBufferUpdate(context);
     });
 
-    // Initialize the STT pipeline
+    // Initialize the STT pipeline (Chunked OpenAI Whisper via Backend)
     this.stt = new SttPipeline(
       this.buffer,
-      config.deepgramApiKey,
-      config.deepgramWsUrl,
-      config.deepgramModel
+      config.backendUrl
     );
 
     // Initialize the WebRTC client

@@ -47,41 +47,51 @@ async function initializeAudioPipeline(streamId: string): Promise<void> {
       mimeType: getSupportedMimeType(),
     };
 
-    mediaRecorder = new MediaRecorder(mediaStream, recorderOptions);
+    let recordingInterval: ReturnType<typeof setInterval>;
+    
+    const startRecordingSlice = () => {
+      if (!mediaStream || !audioContext) return;
+      
+      const recorder = new MediaRecorder(mediaStream, recorderOptions);
+      
+      recorder.ondataavailable = (event: BlobEvent) => {
+        if (event.data.size > 0) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            chrome.runtime.sendMessage({
+              action: MessageActions.AUDIO_CHUNK_EMITTED,
+              payload: {
+                dataUrl: reader.result,
+                mimeType: event.data.type,
+                timestamp: Date.now(),
+              },
+            });
+          };
+          reader.readAsDataURL(event.data);
+        }
+      };
 
-    mediaRecorder.ondataavailable = (event: BlobEvent) => {
-      if (event.data.size > 0) {
-        // Emit chunk to any listener (bridge to Member 4's STT WebSocket)
-        chrome.runtime.sendMessage({
-          action: MessageActions.AUDIO_CHUNK_EMITTED,
-          payload: {
-            timestamp: Date.now(),
-            chunkSize: event.data.size,
-            mimeType: event.data.type,
-          },
-        });
+      recorder.onerror = (event) => {
+        console.error('[WhisperNet Offscreen] MediaRecorder error:', event);
+      };
 
-        // Also broadcast via BroadcastChannel for direct offscreen-to-content communication
-        const channel = new BroadcastChannel('whispernet-audio');
-        // Convert blob to array buffer for transfer
-        event.data.arrayBuffer().then((buffer) => {
-          channel.postMessage({
-            type: 'audio-chunk',
-            buffer,
-            mimeType: event.data.type,
-            timestamp: Date.now(),
-          });
-          channel.close();
-        });
-      }
+      recorder.start();
+      mediaRecorder = recorder; // keep ref for teardown
+      
+      // Stop slightly before the next interval to ensure no overlap and valid WebM header
+      setTimeout(() => {
+        if (recorder.state === 'recording') {
+          recorder.stop();
+        }
+      }, 4900);
     };
 
-    mediaRecorder.onerror = (event) => {
-      console.error('[WhisperNet Offscreen] MediaRecorder error:', event);
-    };
+    // Kick off the continuous 5-second slices
+    startRecordingSlice();
+    recordingInterval = setInterval(startRecordingSlice, 5000);
 
-    // Start recording with 1-second timeslice intervals
-    mediaRecorder.start(1000);
+    // Save the interval to clear it on teardown
+    (window as any)._recordingInterval = recordingInterval;
 
     console.log('[WhisperNet Offscreen] Audio pipeline initialized successfully.');
     console.log(`[WhisperNet Offscreen] MIME type: ${recorderOptions.mimeType}`);
@@ -115,6 +125,11 @@ function getSupportedMimeType(): string {
 // --------------- Cleanup ---------------
 
 function teardownAudioPipeline(): void {
+  if ((window as any)._recordingInterval) {
+    clearInterval((window as any)._recordingInterval);
+    delete (window as any)._recordingInterval;
+  }
+
   if (mediaRecorder && mediaRecorder.state !== 'inactive') {
     mediaRecorder.stop();
   }
