@@ -196,10 +196,10 @@ class DatabricksClient:
     ) -> dict[str, Any]:
         """Execute a live query against Member 2's Databricks endpoint."""
         payload = {
-            "query": query,
-            "current_context": current_context,
-            "max_episode_index": max_episode_index,
-            "top_k": top_k,
+            "columns": ["id", "text", "episode_index", "character_tags"],
+            "query_text": f"{query} {current_context}".strip(),
+            "num_results": top_k,
+            "filters": {"episode_index <=": max_episode_index}
         }
 
         try:
@@ -214,10 +214,22 @@ class DatabricksClient:
                 )
                 response.raise_for_status()
                 data = response.json()
+                
+                # Databricks Vector Search returns data in `result.data_array`
+                retrieved_chunks = []
+                if "result" in data and "data_array" in data["result"]:
+                    for row in data["result"]["data_array"]:
+                        if len(row) >= 2:
+                            retrieved_chunks.append({
+                                "id": row[0],
+                                "text": row[1],
+                                "episode_index": row[2] if len(row) > 2 else 0,
+                                "character_tags": row[3] if len(row) > 3 else []
+                            })
 
                 return {
-                    "retrieved_chunks": data.get("retrieved_chunks", []),
-                    "character_profile": data.get("character_profile"),
+                    "retrieved_chunks": retrieved_chunks,
+                    "character_profile": None,
                     "retrieval_status": "SUCCESS",
                 }
 

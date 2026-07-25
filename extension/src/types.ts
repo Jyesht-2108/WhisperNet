@@ -83,12 +83,6 @@ export interface MediaPlayerState {
 export interface VoicePipelineConfig {
   /** Base URL for Member 3's FastAPI backend (e.g., http://localhost:8000) */
   backendUrl: string;
-  /** Deepgram API key for streaming STT */
-  deepgramApiKey: string;
-  /** Deepgram STT WebSocket URL (default: wss://api.deepgram.com/v1/listen) */
-  deepgramWsUrl?: string;
-  /** Deepgram model to use (default: nova-2) */
-  deepgramModel?: string;
   /** OpenAI Realtime model ID */
   realtimeModel?: string;
   /** Rolling buffer max word count (default: 150) */

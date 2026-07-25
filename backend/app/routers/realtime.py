@@ -76,7 +76,7 @@ async def exchange_token(request: RealtimeTokenRequest) -> RealtimeTokenResponse
             session_response.raise_for_status()
             session_data = session_response.json()
 
-            ephemeral_key = session_data.get("value", "")
+            ephemeral_key = session_data.get("value") or session_data.get("client_secret", {}).get("value")
             session_id = session_data.get("session", {}).get("id", "unknown")
 
             if not ephemeral_key:

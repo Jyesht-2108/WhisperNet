@@ -31,8 +31,7 @@ class GeneratePromptRequest(BaseModel):
     """
 
     user_query: str = Field(
-        ...,
-        min_length=1,
+        default="",
         max_length=2000,
         description="The live transcribed text of what the user just asked.",
     )
@@ -146,6 +145,6 @@ class RealtimeTokenRequest(BaseModel):
         description="The local WebRTC Session Description Protocol (SDP) offer.",
     )
     model: str = Field(
-        default="gpt-4o-realtime-preview",
+        default="gpt-4o-realtime-preview-2024-12-17",
         description="The OpenAI Realtime model to use.",
     )

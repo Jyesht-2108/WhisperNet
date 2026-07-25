@@ -103,10 +103,7 @@ function getBarStyles(index: number) {
 function getPipelineConfig(): VoicePipelineConfig {
   return {
     backendUrl: 'http://localhost:8000',
-    deepgramApiKey: '', // Set via chrome.storage.local or popup settings
-    deepgramWsUrl: 'wss://api.deepgram.com/v1/listen',
-    deepgramModel: 'nova-2',
-    realtimeModel: 'gpt-4o-realtime-preview',
+    realtimeModel: 'gpt-realtime-2',
     bufferMaxWords: 150,
     bufferTrimInterval: 5000,
   };
@@ -184,7 +181,10 @@ export const WhisperNetWidget: React.FC = () => {
         pipelineRef.current?.startPassiveStream();
       }
       if (message.action === MessageActions.AUDIO_CAPTURE_ERROR) {
-        console.error('[WhisperNet Widget] Capture error received');
+        const payload = message.payload as any;
+        console.error('[WhisperNet Widget] Capture error received:', payload?.error);
+        setPipelineError(`Capture Error: ${payload?.error || 'Unknown error'}`);
+        setTimeout(() => setPipelineError(null), 5000);
         setWidgetState('idle');
       }
     };
@@ -364,14 +364,12 @@ export const WhisperNetWidget: React.FC = () => {
         {/* --- Controls --- */}
         <div className="wn-controls">
           {widgetState === 'idle' && (
-            <button
-              className="wn-btn wn-btn--primary"
-              onClick={handleStartCapture}
-              id="whispernet-start-stream"
-            >
+            <div className="wn-instruction-box" style={{ textAlign: 'center', padding: '10px', fontSize: '13px', color: '#ccc' }}>
               <IconStream />
-              Start Stream
-            </button>
+              <p style={{ marginTop: '8px', marginBottom: 0 }}>
+                Click the <strong>WhisperNet icon</strong> in your browser toolbar to start capturing audio.
+              </p>
+            </div>
           )}
 
           {widgetState === 'listening' && (

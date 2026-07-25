@@ -16,6 +16,7 @@ const OFFSCREEN_DOCUMENT_PATH = 'src/offscreen/offscreen.html';
 // --------------- Offscreen Document Lifecycle ---------------
 
 let creatingOffscreen: Promise<void> | null = null;
+let activeTabId: number | null = null;
 
 async function hasOffscreenDocument(): Promise<boolean> {
   // In Manifest V3, we can check existing contexts
@@ -98,14 +99,33 @@ chrome.runtime.onMessage.addListener(
         .catch((err) => sendResponse({ success: false, error: err.message }));
       return true;
     }
+
+    // Forward chunks from offscreen to the active tab
+    if (message.action === MessageActions.AUDIO_CHUNK_EMITTED) {
+      if (activeTabId !== null) {
+        chrome.tabs.sendMessage(activeTabId, message);
+      }
+      return false; // Sync response
+    }
   }
 );
+
+// Allow clicking the extension icon to start capture (grants activeTab)
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id) {
+    const fakeSender: chrome.runtime.MessageSender = { tab };
+    handleStartCapture(fakeSender).catch((err) => {
+      console.error('[WhisperNet BG] Capture error from action click:', err);
+    });
+  }
+});
 
 async function handleStartCapture(sender: chrome.runtime.MessageSender): Promise<void> {
   const tabId = sender.tab?.id;
   if (!tabId) {
     throw new Error('No tab ID found in sender context.');
   }
+  activeTabId = tabId;
 
   // Step 1: Ensure offscreen document exists
   await ensureOffscreenDocument();
@@ -134,4 +154,5 @@ async function handleStopCapture(): Promise<void> {
     await chrome.offscreen.closeDocument();
     console.log('[WhisperNet BG] Offscreen document closed, capture stopped.');
   }
+  activeTabId = null;
 }
