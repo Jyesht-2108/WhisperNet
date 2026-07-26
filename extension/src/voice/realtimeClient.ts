@@ -285,8 +285,14 @@ export class RealtimeClient {
       console.log(`[WhisperNet RTC] AI called search_lore with query: "${args.query}"`);
 
       // 1. Call backend to search lore
-      const response = await fetch(`${this.backendUrl}/api/search-lore?query=${encodeURIComponent(args.query)}`, {
-        method: 'POST'
+      const response = await fetch(`${this.backendUrl}/api/search-lore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: args.query,
+          episode_index: args.episode_index || 999,
+          top_k: 3
+        })
       });
       const result = await response.json();
 
@@ -340,7 +346,7 @@ export class RealtimeClient {
               type: 'server_vad',
               threshold: 0.5,
               prefix_padding_ms: 300,
-              silence_duration_ms: 1200,
+              silence_duration_ms: 700,
             }
           },
           output: {
@@ -351,11 +357,18 @@ export class RealtimeClient {
           {
             type: 'function',
             name: 'search_lore',
-            description: 'Search the story lore database to answer questions about characters, items, or events.',
+            description: 'Search the story knowledge base for specific character information, plot events, or world-building details. Use this tool whenever the user asks about a character, event, or detail from the story. The results are filtered to prevent spoilers beyond the current episode.',
             parameters: {
               type: 'object',
               properties: {
-                query: { type: 'string', description: 'The specific entity or question to look up' }
+                query: { 
+                  type: 'string', 
+                  description: 'The search query — what the user is asking about. Example: \'Why did Jake go to lunch with Jacob?\'' 
+                },
+                episode_index: {
+                  type: 'integer',
+                  description: 'The current episode number the user is listening to. Only lore from this episode or earlier will be returned.'
+                }
               },
               required: ['query']
             }

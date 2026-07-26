@@ -6,6 +6,7 @@ from environment variables (or .env file via docker-compose).
 """
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings
 
@@ -25,6 +26,8 @@ class Settings(BaseSettings):
     # ── Databricks Configuration ──
     DATABRICKS_ENDPOINT_URL: str = "https://placeholder.cloud.databricks.com"
     DATABRICKS_API_TOKEN: str = "dapi-placeholder"
+    DATABRICKS_HOST: str = ""
+    DATABRICKS_SQL_HTTP_PATH: str = ""
     USE_MOCK_DATABRICKS: bool = True
 
     # ── CORS ──
@@ -36,7 +39,7 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
     model_config = {
-        "env_file": ".env",
+        "env_file": str(Path(__file__).parent.parent / ".env"),
         "env_file_encoding": "utf-8",
         "case_sensitive": True,
     }

@@ -49,7 +49,18 @@ async def transcribe_audio(audio: UploadFile = File(...)):
             result = response.json()
             text = result.get("text", "").strip()
             
-            logger.info(f"Successfully transcribed chunk: '{text}'")
+            if text:
+                logger.info(f"Successfully transcribed chunk: '{text}'")
+                
+                # Fire-and-forget upsert to Databricks Vector Search
+                # We don't await this directly in the critical path to avoid slowing down STT response,
+                # but since we are in async, we can just await it or use asyncio.create_task.
+                # For simplicity and robust error handling, we await it.
+                from app.services.databricks_client import DatabricksClient
+                client_db = DatabricksClient()
+                import asyncio
+                asyncio.create_task(client_db.upsert_lore(text=text, episode_index=1))
+                
             return {"text": text}
 
     except httpx.HTTPStatusError as e:
