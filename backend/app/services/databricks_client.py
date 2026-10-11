@@ -196,7 +196,7 @@ class DatabricksClient:
     ) -> dict[str, Any]:
         """Execute a live query against Member 2's Databricks endpoint."""
         payload = {
-            "columns": ["id", "text", "episode_index", "character_tags"],
+            "columns": ["id", "text", "episode_index"],
             "query_text": f"{query} {current_context}".strip(),
             "num_results": top_k,
             "filters": {"episode_index <=": max_episode_index}
@@ -239,6 +239,53 @@ class DatabricksClient:
         except httpx.RequestError as e:
             logger.error("Databricks API request failed: %s", str(e))
             return {"retrieved_chunks": [], "character_profile": None, "retrieval_status": "ERROR"}
+
+    async def upsert_lore(self, text: str, episode_index: int = 1) -> bool:
+        """
+        Upsert a live transcription chunk directly into Databricks Vector Search.
+        Note: This only works for Direct Vector Access Indexes.
+        """
+        if self.use_mock:
+            logger.info("Mock Databricks upsert: %s", text[:50])
+            return True
+
+        if not self.settings.DATABRICKS_SQL_HTTP_PATH:
+            logger.warning("DATABRICKS_SQL_HTTP_PATH not configured. Cannot save live transcription to Delta Table.")
+            return False
+
+        import uuid
+        import asyncio
+        from databricks import sql
+
+        server_hostname = self.settings.DATABRICKS_HOST.replace("https://", "").replace("http://", "").strip("/")
+        http_path = self.settings.DATABRICKS_SQL_HTTP_PATH
+        token = self.settings.DATABRICKS_API_TOKEN
+        
+        doc_id = str(uuid.uuid4())
+        
+        def _execute_sql_insert():
+            # Run the synchronous DBAPI call inside a thread
+            with sql.connect(
+                server_hostname=server_hostname,
+                http_path=http_path,
+                access_token=token
+            ) as connection:
+                with connection.cursor() as cursor:
+                    query = """
+                    INSERT INTO whispernet.rag.solo_leveling_lore 
+                    (id, text, episode_index, character_tags) 
+                    VALUES (?, ?, ?, array('Live_Transcription'))
+                    """
+                    cursor.execute(query, (doc_id, text, episode_index))
+
+        try:
+            # Run blocking DB operation in a background thread to prevent blocking the FastAPI event loop
+            await asyncio.to_thread(_execute_sql_insert)
+            logger.info("Successfully inserted live transcription chunk into whispernet.rag.solo_leveling_lore Delta Table.")
+            return True
+        except Exception as e:
+            logger.error("Failed to insert into Delta Table via SQL: %s", str(e))
+            return False
 
     def _mock_query(
         self,
